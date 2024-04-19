@@ -434,6 +434,55 @@ task merge_bams {
 	}
 }
 
+task sniffles {
+	input {
+		String sample_id
+
+		File bam
+		File bam_index
+
+		File reference
+		File reference_index
+		File tandem_repeat_bed
+
+		RuntimeAttributes runtime_attributes
+	}
+
+	String bam_basename = basename(bam, ".bam")
+	Int disk_size = ceil((size(bam, "GB") + size(ref_fasta, "GB")) * 2 + 20)
+
+	command <<<
+		set -euxo pipefail
+
+		sniffles --version
+
+		sniffles \ 
+			--input ~{bam}\
+			--snf ~{pname}_sniffles/~{bam_basename}.sniffles.snf \
+			--tandem-repeats tandem_repeat_bed \
+			--reference ~{ref_fasta} \
+			--mosaic \
+			--threads ~{threads - 1}
+	>>>
+
+	output {
+		File sv_snf = "~{bam_basename}.sniffles.snf"
+	}
+
+	runtime {
+		docker: "~{runtime_attributes.container_registry}/sniffles@sha256:feb1c41eae608ebc2c2cb594144bb3c221b87d9bb691d0af6ad06b49fd54573a"
+		cpu: threads
+		memory: "4 GB"
+		disk: disk_size + " GB"
+		disks: "local-disk " + disk_size + " HDD"
+		preemptible: runtime_attributes.preemptible_tries
+		maxRetries: runtime_attributes.max_retries
+		awsBatchRetryAttempts: runtime_attributes.max_retries
+		queueArn: runtime_attributes.queue_arn
+		zones: runtime_attributes.zones
+	}
+}
+
 task trgt {
 	input {
 		String sample_id
